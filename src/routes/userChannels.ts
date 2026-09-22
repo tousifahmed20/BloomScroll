@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { config } from '../config';
 import { query } from '../db';
-import { getChannel, listUploadIds, getVideos } from '../youtube';
+import { getChannel } from '../youtube';
+import { saveTokens } from '../tokens';
+import { ingestUserChannel } from '../userIngest';
+import { subscribe } from '../websub';
 
 /**
  * Per-account channels. Everything here is ISOLATED to one user:
@@ -48,8 +51,8 @@ userRouter.get('/auth/google/callback', async (req: Request, res: Response) => {
     }),
   });
   const tokens = await tokenRes.json();
-  // TODO: persist tokens.refresh_token securely, server-side, keyed by userId.
   await query(`INSERT INTO users (id) VALUES ($1) ON CONFLICT DO NOTHING`, [userId]);
+  await saveTokens(userId, tokens);
   res.json({ linked: true, hasRefreshToken: Boolean(tokens.refresh_token) });
 });
 
@@ -78,19 +81,12 @@ userRouter.post('/me/channels', async (req: Request, res: Response) => {
   );
 
   // Ingest a shallow slice into the user's ISOLATED table.
-  const { ids } = await listUploadIds(uploadsPlaylistId);
-  const videos = await getVideos(ids);
-  for (const v of videos) {
-    await query(
-      `INSERT INTO user_videos
-         (user_id, video_id, channel_id, title, duration_sec, content_type, thumbnail_url, published_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-       ON CONFLICT (user_id, video_id) DO NOTHING`,
-      [userId, v.id, v.channelId, v.title, v.durationSec, v.contentType, v.thumbnailUrl, v.publishedAt],
-    );
-  }
-  // TODO: also subscribe(channelId) to WebSub so the user's channel stays fresh for free.
-  res.json({ added: title, ingested: videos.length });
+  const ingested = await ingestUserChannel(userId, uploadsPlaylistId);
+
+  // Keep it fresh for free: WebSub notifications fan out to this user in the callback.
+  try { await subscribe(channelId); } catch (e) { console.error('WebSub subscribe failed:', e); }
+
+  res.json({ added: title, ingested });
 });
 
 // The user's personal feed (isolated).

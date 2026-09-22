@@ -76,3 +76,13 @@ CREATE TABLE IF NOT EXISTS user_videos (
   PRIMARY KEY (user_id, video_id)
 );
 CREATE INDEX IF NOT EXISTS idx_user_videos_user ON user_videos(user_id, published_at DESC);
+
+-- OAuth tokens for linked accounts (refresh token is the durable credential).
+CREATE TABLE IF NOT EXISTS user_oauth_tokens (
+  user_id       TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  refresh_token TEXT,
+  access_token  TEXT,
+  expires_at    TIMESTAMPTZ,
+  scope         TEXT,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);

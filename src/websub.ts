@@ -3,6 +3,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { config } from './config';
 import { getVideos } from './youtube';
 import { upsertVideo, themesForChannel } from './ingest';
+import { upsertUserVideo, usersForChannel } from './userIngest';
 
 const TOPIC = (channelId: string) =>
   `https://www.youtube.com/xml/feeds/videos.xml?channel_id=${channelId}`;
@@ -50,8 +51,14 @@ websubRouter.post('/callback', async (req: Request, res: Response) => {
 
     const [video] = await getVideos([videoId]); // 1 unit
     if (!video) return;
+
+    // Global catalogue: write only if this is a curated (theme-tagged) channel.
     const themeIds = await themesForChannel(channelId);
-    await upsertVideo(video, themeIds);
+    if (themeIds.length > 0) await upsertVideo(video, themeIds);
+
+    // Per-account: fan out to every user who added this channel (isolated).
+    const userIds = await usersForChannel(channelId);
+    for (const userId of userIds) await upsertUserVideo(userId, video);
   } catch (err) {
     console.error('WebSub notification error:', err);
   }

@@ -83,3 +83,22 @@ PRs welcome. Keep the compliance guardrails above intact — they're non-negotia
 ## License
 
 MIT — see [LICENSE](./LICENSE).
+
+## Android app (`/android`)
+
+Kotlin + Jetpack Compose. Talks only to this backend; plays video via the
+official IFrame player (wrapped by `android-youtube-player`).
+
+- **Theme picker** → `GET /themes`.
+- **Feed** with a Shorts / Long-form toggle → `GET /themes/:id/videos?type=…`.
+  Shorts render as a full-screen `VerticalPager`; long-form as a thumbnail list
+  that plays inline on tap.
+- Set the backend URL in `android/app/build.gradle.kts` (`BASE_URL`).
+
+Open the `android/` folder in Android Studio (it will generate the Gradle
+wrapper), then Run. Requires Android Studio Koala+ / AGP 8.5, minSdk 24.
+
+> Note: the Android module is a reviewed scaffold, **not build-verified** here
+> (no Android SDK in the build environment). The backend *is* type-checked.
+> Known scaffold TODOs: pause off-screen Shorts players, and debounce the
+> load-more trigger.
